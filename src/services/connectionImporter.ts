@@ -42,12 +42,16 @@ export class ConnectionImporter {
     }
 
     // Resolve the endpoint set (respecting any existing overrides) and probe all
-    // of them with the credential.
+    // of them with the credential. A key from a different environment than the
+    // existing enterprise's (e.g. qa.mfgx under build.mfgx) is pinned on the
+    // tenant, so it resolves to its own host instead of the enterprise's.
     const existing = this.configManager.getEnterprise(enterpriseId);
+    const enterpriseEnv = existing?.environment?.trim();
+    const tenantEnv = enterpriseEnv && enterpriseEnv !== environment ? environment : undefined;
     const probeBasis: Enterprise = existing
-      ? { ...existing, environment: existing.environment || environment }
+      ? { ...existing, environment: enterpriseEnv || environment }
       : { id: enterpriseId, name: enterpriseId, environment, mcpEndpoint: `https://api.${environment}.fuuz.app`, tenants: [] };
-    const endpoints = this.configManager.endpointsFor(probeBasis);
+    const endpoints = this.configManager.endpointsFor(probeBasis, tenantEnv ? { id: tenantId, name: tenantId, environment: tenantEnv } : undefined);
     const probes = await this.mcpClient.probeEndpoints(endpoints, token);
 
     const mcp = probes.find(p => p.key === 'mcp')!;
@@ -68,7 +72,7 @@ export class ConnectionImporter {
           tenants: [],
         };
     await this.configManager.addOrUpdateEnterprise(enterprise);
-    await this.configManager.addOrUpdateTenant(enterpriseId, { id: tenantId, name: tenantName }, token);
+    await this.configManager.addOrUpdateTenant(enterpriseId, { id: tenantId, name: tenantName, environment: tenantEnv }, token);
 
     return {
       enterpriseId,

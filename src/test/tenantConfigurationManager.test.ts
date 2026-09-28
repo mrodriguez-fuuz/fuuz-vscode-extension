@@ -92,3 +92,23 @@ test('migrateLegacyKeys moves plaintext apiKey into secrets and strips it from s
   await mgr.migrateLegacyKeys();
   assert.equal(await tokenStore.getToken('e1', 't1'), 'ROTATED');
 });
+
+test('endpointsFor/getMcpServerUrl resolve per tenant; getEnvironments groups by slug', async () => {
+  const { mgr } = setup();
+  await mgr.addOrUpdateEnterprise({ id: 'e1', name: 'E1', environment: 'build.mfgx', mcpEndpoint: 'https://api.build.mfgx.fuuz.app', tenants: [] });
+  await mgr.addOrUpdateTenant('e1', { id: 'b1', name: 'Build 1' });
+  await mgr.addOrUpdateTenant('e1', { id: 'q1', name: 'QA 1', environment: 'qa.mfgx' });
+  await mgr.addOrUpdateTenant('e1', { id: 'b2', name: 'Build 2' });
+  const e = mgr.getEnterprise('e1')!;
+  const [b1, q1] = e.tenants;
+
+  assert.equal(mgr.getMcpServerUrl(e), 'https://api.build.mfgx.fuuz.app/mcp', 'enterprise-only call unchanged');
+  assert.equal(mgr.getMcpServerUrl(e, b1), 'https://api.build.mfgx.fuuz.app/mcp');
+  assert.equal(mgr.getMcpServerUrl(e, q1), 'https://api.qa.mfgx.fuuz.app/mcp');
+  assert.equal(mgr.environmentOf(e, q1), 'qa.mfgx');
+
+  assert.deepEqual(
+    mgr.getEnvironments(e).map(g => [g.environment, g.tenants.map(t => t.id)]),
+    [['build.mfgx', ['b1', 'b2']], ['qa.mfgx', ['q1']]]
+  );
+});

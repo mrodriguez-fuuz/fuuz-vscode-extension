@@ -85,9 +85,9 @@ export class ClaudeMcpWriter {
   plannedServers(): PlannedClaudeServer[] {
     const planned: PlannedClaudeServer[] = [];
     for (const enterprise of this.configManager.getEnterprises()) {
-      const url = this.configManager.getMcpServerUrl(enterprise);
       for (const tenant of enterprise.tenants) {
         if (tenant.disabled) continue; // keep config but don't register
+        const url = this.configManager.getMcpServerUrl(enterprise, tenant);
         planned.push({
           enterpriseId: enterprise.id,
           tenantId: tenant.id,

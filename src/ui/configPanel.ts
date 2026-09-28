@@ -135,7 +135,7 @@ export class ConfigPanel {
           // Re-probe so the user immediately sees whether the new key works,
           // and re-sync resources with the new credential.
           const probes = await mcpClient.probeEndpoints(
-            configManager.endpointsFor(configManager.getEnterprise(msg.enterpriseId)!),
+            configManager.endpointsFor(configManager.getEnterprise(msg.enterpriseId)!, tenant),
             newKey.trim()
           );
           this.applyHealth(msg.enterpriseId, msg.tenantId, probes);
@@ -155,7 +155,8 @@ export class ConfigPanel {
             return;
           }
           // Probe every endpoint (MCP / flow / webhook) and report each one.
-          const probes = await mcpClient.probeEndpoints(configManager.endpointsFor(enterprise), token);
+          const tenant = configManager.getTenant(msg.enterpriseId, msg.tenantId) ?? undefined;
+          const probes = await mcpClient.probeEndpoints(configManager.endpointsFor(enterprise, tenant), token);
           this.applyHealth(msg.enterpriseId, msg.tenantId, probes);
           await this.post({ type: 'probeResult', tenantId: msg.tenantId, probes });
           return;
@@ -181,7 +182,7 @@ export class ConfigPanel {
         const token = await tokenStore.getToken(e.id, t.id);
         if (!token) { await this.post({ type: 'probeResult', tenantId: t.id, probes: [], message: 'No API key set' }); continue; }
         try {
-          const probes = await mcpClient.probeEndpoints(configManager.endpointsFor(e), token);
+          const probes = await mcpClient.probeEndpoints(configManager.endpointsFor(e, t), token);
           this.applyHealth(e.id, t.id, probes);
           await this.post({ type: 'probeResult', tenantId: t.id, probes });
         } catch (err) {
@@ -218,6 +219,10 @@ export class ConfigPanel {
             hasToken: await tokenStore.hasToken(e.id, t.id),
             active: activeEnt?.id === e.id && activeTen?.id === t.id,
             disabled: t.disabled === true,
+            // Only surfaced when it differs from the enterprise's, so the
+            // common single-environment case renders exactly as before.
+            environment: t.environment?.trim() && t.environment.trim() !== (e.environment ?? '').trim() ? t.environment.trim() : undefined,
+            mcp: configManager.getMcpServerUrl(e, t),
           }))
         ),
       }))

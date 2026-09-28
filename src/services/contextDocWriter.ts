@@ -46,7 +46,7 @@ export class ContextDocWriter {
     await vscode.workspace.fs.writeFile(designUri, Buffer.from(renderDesignSystemDoc(), 'utf8'));
 
     const uri = vscode.Uri.joinPath(dir, 'AVAILABLE.md');
-    const md = this.render(enterprise.name, tenant.name, this.configManager.endpointsFor(enterprise), resources, disabled);
+    const md = this.render(enterprise.name, tenant.name, this.configManager.endpointsFor(enterprise, tenant), resources, disabled);
     await vscode.workspace.fs.writeFile(uri, Buffer.from(md, 'utf8'));
     return uri;
   }

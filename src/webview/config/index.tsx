@@ -87,6 +87,7 @@ function TenantRow({ enterprise, tenant, status }: { enterprise: EnterpriseView;
   return (
     <div className={`tenant${tenant.disabled ? ' off' : ''}`}>
       <span className="name">{tenant.name}</span>
+      {tenant.environment && <span className="badge" title={`MCP: ${tenant.mcp}`}>env: {tenant.environment}</span>}
       {tenant.active && !tenant.disabled && <span className="badge active">active</span>}
       {tenant.disabled && <span className="badge">disabled</span>}
       <span className="badge">{tenant.hasToken ? 'token set' : 'no token'}</span>

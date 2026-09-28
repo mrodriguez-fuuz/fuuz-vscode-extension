@@ -374,6 +374,22 @@
                     "name": {
                       "type": "string",
                       "description": "Tenant display name"
+                    },
+                    "environment": {
+                      "type": "string",
+                      "description": "The {env}.{account} slug when this tenant lives in a different environment than its enterprise, e.g. qa.mfgx. Omit to inherit the enterprise's environment."
+                    },
+                    "mcpServerUrl": {
+                      "type": "string",
+                      "description": "Override for this tenant's MCP server URL."
+                    },
+                    "flowExecutionUrl": {
+                      "type": "string",
+                      "description": "Override for this tenant's flow execution URL."
+                    },
+                    "webhookUrl": {
+                      "type": "string",
+                      "description": "Override for this tenant's webhook base."
                     }
                   },
                   "required": [

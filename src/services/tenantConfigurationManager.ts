@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { Enterprise, EnterpriseEndpoints, Tenant } from '../types';
 import { TokenStore } from './tokenStore';
-import { deriveEndpoints } from '../util/fuuzParse';
+import { deriveEndpoints, resolveEndpointInput, tenantEnvironment } from '../util/fuuzParse';
 
 const CACHE_PREFIX = 'fuuz.resourceCache';
 
@@ -88,14 +88,36 @@ export class TenantConfigurationManager {
     return enterprise?.tenants.find(t => t.id === tenantId) || null;
   }
 
-  /** Resolve every endpoint for an enterprise (overrides win, else derived). */
-  endpointsFor(enterprise: Enterprise): EnterpriseEndpoints {
-    return deriveEndpoints(enterprise);
+  /**
+   * Resolve every endpoint for an enterprise, or for one of its tenants when
+   * given (a tenant's own environment/overrides win over the enterprise's).
+   */
+  endpointsFor(enterprise: Enterprise, tenant?: Tenant): EnterpriseEndpoints {
+    return deriveEndpoints(resolveEndpointInput(enterprise, tenant));
   }
 
-  /** Convenience: the streamable-HTTP MCP server URL for an enterprise. */
-  getMcpServerUrl(enterprise: Enterprise): string {
-    return this.endpointsFor(enterprise).mcp;
+  /** Convenience: the streamable-HTTP MCP server URL for an enterprise or tenant. */
+  getMcpServerUrl(enterprise: Enterprise, tenant?: Tenant): string {
+    return this.endpointsFor(enterprise, tenant).mcp;
+  }
+
+  /** The environment slug a tenant resolves to (its own, else the enterprise's). */
+  environmentOf(enterprise: Enterprise, tenant?: Tenant): string {
+    return tenantEnvironment(enterprise, tenant);
+  }
+
+  /**
+   * Group an enterprise's tenants by resolved environment slug, in the order
+   * each environment first appears in the tenant list.
+   */
+  getEnvironments(enterprise: Enterprise): { environment: string; tenants: Tenant[] }[] {
+    const groups = new Map<string, Tenant[]>();
+    for (const tenant of enterprise.tenants) {
+      const env = this.environmentOf(enterprise, tenant);
+      if (!groups.has(env)) groups.set(env, []);
+      groups.get(env)!.push(tenant);
+    }
+    return [...groups].map(([environment, tenants]) => ({ environment, tenants }));
   }
 
   // --- Writes ------------------------------------------------------------

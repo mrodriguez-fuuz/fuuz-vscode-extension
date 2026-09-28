@@ -17,9 +17,10 @@ function setup(probes: any[]) {
   const context = makeContext();
   const tokenStore = new TokenStore(context.secrets);
   const mgr = new TenantConfigurationManager(context, tokenStore);
-  const mcpClient: any = { probeEndpoints: async () => probes };
+  const probed: string[] = [];
+  const mcpClient: any = { probeEndpoints: async (ep: any) => { probed.push(ep.mcp); return probes; } };
   const importer = new ConnectionImporter(mgr, tokenStore, mcpClient);
-  return { mgr, tokenStore, importer };
+  return { mgr, tokenStore, importer, probed };
 }
 
 const availableMcp = [{ key: 'mcp', label: 'MCP', url: 'https://api.build.mfgx.fuuz.app/mcp', state: 'available', serverName: 'Fuuz: Acme / Plant A' }];
@@ -59,4 +60,24 @@ test('createdEnterprise=false when the enterprise already exists', async () => {
   assert.equal(res.createdEnterprise, false);
   assert.equal(res.enterpriseName, 'Existing Ent', 'existing enterprise name is preserved');
   assert.equal(mgr.getTenant('e1', 't1')?.name, 'Plant A');
+});
+
+test('a key from another environment is pinned on the tenant and probed against its own host', async () => {
+  const { importer, mgr, probed } = setup(availableMcp);
+  await mgr.addOrUpdateEnterprise({ id: 'e1', name: 'Ent', environment: 'build.mfgx', mcpEndpoint: 'https://api.build.mfgx.fuuz.app', tenants: [] });
+  await importer.importByToken(jwt({ aud: 'qa.mfgx.fuuz.app', tenantId: 'q1', enterpriseId: 'e1' }));
+
+  assert.deepEqual(probed, ['https://api.qa.mfgx.fuuz.app/mcp']);
+  assert.equal(mgr.getEnterprise('e1')?.environment, 'build.mfgx', 'enterprise environment unchanged');
+  const tenant = mgr.getTenant('e1', 'q1')!;
+  assert.equal(tenant.environment, 'qa.mfgx');
+  assert.equal(mgr.getMcpServerUrl(mgr.getEnterprise('e1')!, tenant), 'https://api.qa.mfgx.fuuz.app/mcp');
+});
+
+test('a key from the enterprise environment leaves the tenant inheriting', async () => {
+  const { importer, mgr, probed } = setup(availableMcp);
+  await mgr.addOrUpdateEnterprise({ id: 'e1', name: 'Ent', environment: 'build.mfgx', mcpEndpoint: 'https://api.build.mfgx.fuuz.app', tenants: [] });
+  await importer.importByToken(jwt({ aud: 'build.mfgx.fuuz.app', tenantId: 't1', enterpriseId: 'e1' }));
+  assert.deepEqual(probed, ['https://api.build.mfgx.fuuz.app/mcp']);
+  assert.equal(mgr.getTenant('e1', 't1')?.environment, undefined);
 });

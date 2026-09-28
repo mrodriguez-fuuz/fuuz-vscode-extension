@@ -141,7 +141,7 @@ export async function activate(context: vscode.ExtensionContext) {
       const token = await tokenStore.getToken(ent.id, t.id);
       if (!token) { health.set(ent.id, t.id, 'unreachable', 'No API key set'); return; }
       try {
-        const probes = await mcpClient.probeEndpoints(configManager.endpointsFor(ent), token);
+        const probes = await mcpClient.probeEndpoints(configManager.endpointsFor(ent, t), token);
         const mcp = probes.find(p => p.key === 'mcp');
         const state: import('./services/connectionHealth').HealthState = !mcp ? 'unknown'
           : mcp.state === 'available' ? 'ok'
@@ -339,7 +339,7 @@ function registerCommands(context: vscode.ExtensionContext, deps: CommandDeps) {
     if (!newKey) return;
     try {
       await tokenStore.setToken(enterprise.id, tenant.id, newKey.trim());
-      const probe = await mcpClient.initializeMcp(configManager.endpointsFor(enterprise).mcp, newKey.trim());
+      const probe = await mcpClient.initializeMcp(configManager.endpointsFor(enterprise, tenant).mcp, newKey.trim());
       health.set(enterprise.id, tenant.id, probe.ok ? 'ok' : 'unauthorized', probe.ok ? undefined : probe.message);
       resourceService.forgetUnauthorizedWarning(tenant.id); // new key → re-check perms
       await resourceService.syncTenantResources(tenant).catch(err => fuuzLog(`sync after key replace failed: ${errMsg(err)}`));
@@ -550,7 +550,7 @@ function registerCommands(context: vscode.ExtensionContext, deps: CommandDeps) {
     if (enterprise && tenant) {
       token = await deps.tokenStore.getToken(enterprise.id, tenant.id);
       // Verification is reading the record back, so the tenant MCP matters here.
-      if (token) fuuz = { url: deps.configManager.getMcpServerUrl(enterprise), tenantId: tenant.id, tokenEnvVar: 'FUUZ_UI_TOKEN' };
+      if (token) fuuz = { url: deps.configManager.getMcpServerUrl(enterprise, tenant), tenantId: tenant.id, tokenEnvVar: 'FUUZ_UI_TOKEN' };
     }
 
     const launch = buildUiSessionLaunch({
@@ -1299,7 +1299,7 @@ function registerCommands(context: vscode.ExtensionContext, deps: CommandDeps) {
     const enterprise = configManager.getActiveEnterprise();
     if (!enterprise) { vscode.window.showWarningMessage('Select an active Fuuz tenant first.'); return; }
     // The app host is the environment slug (aud/iss host), e.g. build.mfgx.fuuz.app.
-    const env = enterprise.environment?.trim();
+    const env = configManager.environmentOf(enterprise, configManager.getActiveTenant() ?? undefined);
     const host = env ? `https://${env}.fuuz.app` : enterprise.mcpEndpoint.replace(/\/$/, '').replace(/^https?:\/\/api\./, 'https://');
     await vscode.env.openExternal(vscode.Uri.parse(host));
   });
@@ -1397,7 +1397,7 @@ async function startQaRun(
     if (pick) await vscode.commands.executeCommand('fuuz.selectTenant');
     return;
   }
-  const target = deriveTarget(enterprise.environment ?? '');
+  const target = deriveTarget(configManager.environmentOf(enterprise, tenant));
 
   // Pick the role(s) to test from the tenant's Role model — one role per test,
   // multiple roles run concurrently in their own sandboxed sessions.
@@ -1510,7 +1510,7 @@ async function launchClaudeQa(
   let token: string | undefined;
   if (enterprise && tenant) {
     token = await tokenStore.getToken(enterprise.id, tenant.id);
-    if (token) fuuz = { url: configManager.getMcpServerUrl(enterprise), tenantId: tenant.id, tokenEnvVar: 'FUUZ_QA_TOKEN' };
+    if (token) fuuz = { url: configManager.getMcpServerUrl(enterprise, tenant), tenantId: tenant.id, tokenEnvVar: 'FUUZ_QA_TOKEN' };
   }
 
   // Launch from the (already-trusted) workspace root so Claude doesn't prompt to
@@ -1732,7 +1732,10 @@ async function runQaInBrowser(configManager: TenantConfigurationManager, tokenSt
     const planBuf = await vscode.workspace.fs.readFile(vscode.Uri.joinPath(runDir, 'plan.json'));
     targetUrl = JSON.parse(Buffer.from(planBuf).toString('utf8'))?.target?.url ?? '';
   } catch { /* fall back below */ }
-  if (!targetUrl) targetUrl = deriveTarget(configManager.getActiveEnterprise()?.environment ?? '').url;
+  const activeEnterprise = configManager.getActiveEnterprise();
+  if (!targetUrl && activeEnterprise) {
+    targetUrl = deriveTarget(configManager.environmentOf(activeEnterprise, configManager.getActiveTenant() ?? undefined)).url;
+  }
   if (!targetUrl) { vscode.window.showWarningMessage('Fuuz: no target URL — set the enterprise environment first.'); return; }
 
   await launchClaudeQa(configManager, tokenStore, runDir, targetUrl);
@@ -2026,7 +2029,7 @@ async function resolveAppUrl(configManager: TenantConfigurationManager): Promise
     vscode.window.showWarningMessage('Select an active Fuuz tenant first (Fuuz: Select Active Tenant).');
     return undefined;
   }
-  const derived = deriveTarget(enterprise.environment ?? '').url;
+  const derived = deriveTarget(configManager.environmentOf(enterprise, configManager.getActiveTenant() ?? undefined)).url;
   const url = await vscode.window.showInputBox({
     title: 'Fuuz app URL',
     prompt: 'The app to open in the session browser',

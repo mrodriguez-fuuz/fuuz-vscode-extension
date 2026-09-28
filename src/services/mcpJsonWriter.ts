@@ -54,9 +54,9 @@ export class McpJsonWriter {
     }
 
     for (const enterprise of this.configManager.getEnterprises()) {
-      const url = this.configManager.getMcpServerUrl(enterprise);
       for (const tenant of enterprise.tenants) {
         if (tenant.disabled) continue;
+        const url = this.configManager.getMcpServerUrl(enterprise, tenant);
         const inputId = `fuuz-token-${enterprise.id}-${tenant.id}`;
         inputs.push({
           type: 'promptString',

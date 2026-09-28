@@ -44,7 +44,7 @@ export function registerRuntimeCommands(context: vscode.ExtensionContext, deps: 
       vscode.window.showErrorMessage(`No access token stored for ${tenant.name}. Set one in Fuuz: Configure Connections.`);
       return null;
     }
-    return { enterprise, tenant, token, endpoints: configManager.endpointsFor(enterprise) };
+    return { enterprise, tenant, token, endpoints: configManager.endpointsFor(enterprise, tenant) };
   };
 
   const register = (id: string, fn: (...args: any[]) => any) =>

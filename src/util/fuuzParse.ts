@@ -388,6 +388,31 @@ export function deriveApiBase(e: EndpointInput): string {
   return (e.mcpEndpoint ?? '').replace(/\/$/, '');
 }
 
+/**
+ * Merge a tenant's endpoint fields over its enterprise's. A tenant with its own
+ * `environment` gets a fresh derivation from that slug — the enterprise's
+ * explicit `*Url` overrides point at the enterprise's host and are dropped. A
+ * tenant without one inherits everything, with its own `*Url` fields winning.
+ */
+export function resolveEndpointInput(enterprise: EndpointInput, tenant?: EndpointInput): EndpointInput {
+  if (!tenant) return enterprise;
+  const own = (v: string | undefined) => (v && v.trim() ? v : undefined);
+  const base: EndpointInput = own(tenant.environment)
+    ? { environment: tenant.environment }
+    : enterprise;
+  return {
+    ...base,
+    mcpServerUrl: own(tenant.mcpServerUrl) ?? base.mcpServerUrl,
+    flowExecutionUrl: own(tenant.flowExecutionUrl) ?? base.flowExecutionUrl,
+    webhookUrl: own(tenant.webhookUrl) ?? base.webhookUrl,
+  };
+}
+
+/** The environment slug a tenant resolves to (its own, else its enterprise's). */
+export function tenantEnvironment(enterprise: EndpointInput, tenant?: EndpointInput): string {
+  return (tenant?.environment?.trim() || enterprise.environment?.trim() || '');
+}
+
 /** Resolve every endpoint; explicit overrides win, else derived from the API base. */
 export function deriveEndpoints(e: EndpointInput): EnterpriseEndpoints {
   const base = deriveApiBase(e);

@@ -22,6 +22,10 @@ export interface TenantView {
   hasToken: boolean;
   active: boolean;
   disabled: boolean;
+  /** The tenant's own environment slug, set only when it differs from the enterprise's. */
+  environment?: string;
+  /** Resolved MCP server URL for this tenant. */
+  mcp: string;
 }
 
 export interface EnterpriseView {

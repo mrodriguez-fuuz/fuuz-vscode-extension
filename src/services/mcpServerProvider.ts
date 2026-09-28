@@ -35,11 +35,11 @@ export class FuuzMcpServerProvider implements vscode.McpServerDefinitionProvider
     const activeTenant = this.configManager.getActiveTenant();
 
     for (const enterprise of this.configManager.getEnterprises()) {
-      const serverUrl = this.configManager.getMcpServerUrl(enterprise);
       for (const tenant of enterprise.tenants) {
         if (tenant.disabled) {
           continue; // disabled connection → keep config but don't register
         }
+        const serverUrl = this.configManager.getMcpServerUrl(enterprise, tenant);
         const token = await this.tokenStore.getToken(enterprise.id, tenant.id);
         if (!token) {
           continue; // no credential → don't surface a server that can't connect

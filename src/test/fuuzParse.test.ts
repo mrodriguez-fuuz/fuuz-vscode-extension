@@ -12,6 +12,8 @@ import {
   environmentFromClaims,
   namesFrom,
   deriveEndpoints,
+  resolveEndpointInput,
+  tenantEnvironment,
   parseReferences,
   relationshipEdges,
   buildModelGraph,
@@ -276,4 +278,31 @@ test('baseType / isRelationType: scalars vs model references', () => {
   assert.equal(isRelationType('[UserTenant!]'), true);
   // A real FK navigation type is still a relation.
   assert.equal(isRelationType('PackagingConfiguration'), true);
+});
+
+test('resolveEndpointInput: tenant without environment inherits enterprise + its overrides', () => {
+  const ent = { environment: 'build.mfgx', mcpServerUrl: 'https://mcp.custom/mcp' };
+  assert.equal(resolveEndpointInput(ent), ent);
+  const ep = deriveEndpoints(resolveEndpointInput(ent, {}));
+  assert.equal(ep.apiBase, 'https://api.build.mfgx.fuuz.app');
+  assert.equal(ep.mcp, 'https://mcp.custom/mcp');
+});
+
+test('resolveEndpointInput: tenant environment wins and drops enterprise URL overrides', () => {
+  const ent = { environment: 'build.mfgx', mcpServerUrl: 'https://mcp.build-only/mcp', webhookUrl: 'https://hooks.build-only/' };
+  const ep = deriveEndpoints(resolveEndpointInput(ent, { environment: 'qa.mfgx' }));
+  assert.equal(ep.mcp, 'https://api.qa.mfgx.fuuz.app/mcp');
+  assert.equal(ep.webhook, 'https://api.qa.mfgx.fuuz.app/webhook/post/');
+});
+
+test('resolveEndpointInput: tenant URL override wins; blank tenant fields are ignored', () => {
+  const ent = { environment: 'build.mfgx' };
+  assert.equal(deriveEndpoints(resolveEndpointInput(ent, { environment: 'qa.mfgx', mcpServerUrl: 'https://mcp.qa/x' })).mcp, 'https://mcp.qa/x');
+  assert.equal(deriveEndpoints(resolveEndpointInput(ent, { environment: '  ', mcpServerUrl: '' })).mcp, 'https://api.build.mfgx.fuuz.app/mcp');
+});
+
+test('tenantEnvironment: own slug, else enterprise, else empty', () => {
+  assert.equal(tenantEnvironment({ environment: 'build.mfgx' }, { environment: 'qa.mfgx' }), 'qa.mfgx');
+  assert.equal(tenantEnvironment({ environment: 'build.mfgx' }, {}), 'build.mfgx');
+  assert.equal(tenantEnvironment({}), '');
 });

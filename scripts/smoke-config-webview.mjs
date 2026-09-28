@@ -50,7 +50,10 @@ const SAMPLE = {
         id: 'ent-acme', name: 'ACME', environment: 'build.mfgx', mcpEndpoint: 'https://api.build.mfgx.fuuz.app',
         overrides: { mcpServerUrl: '', flowExecutionUrl: '', webhookUrl: '' },
         endpoints: { apiBase: 'https://api.build.mfgx.fuuz.app', mcp: 'https://api.build.mfgx.fuuz.app/mcp', flowExecution: 'https://api.build.mfgx.fuuz.app/orchestration/executeFlow', webhook: 'https://api.build.mfgx.fuuz.app/webhook/post/' },
-        tenants: [{ id: 'tnt-prod', name: 'Production', hasToken: true, active: false, disabled: false }],
+        tenants: [
+          { id: 'tnt-prod', name: 'Production', hasToken: true, active: false, disabled: false, mcp: 'https://api.build.mfgx.fuuz.app/mcp' },
+          { id: 'tnt-qa', name: 'QA', hasToken: true, active: false, disabled: false, environment: 'qa.mfgx', mcp: 'https://api.qa.mfgx.fuuz.app/mcp' },
+        ],
       },
     ],
   },
@@ -76,6 +79,12 @@ async function main() {
     assert.ok(html.includes('ACME'), 'enterprise name missing');
     assert.ok(html.includes('Production'), 'tenant name missing');
     assert.ok(html.includes('env: build.mfgx'), 'environment missing');
+  });
+
+  check('tenant in another environment shows its own env badge', () => {
+    const badges = [...document.querySelectorAll('.badge')].map(b => b.textContent);
+    assert.ok(badges.includes('env: qa.mfgx'), `badges: ${JSON.stringify(badges)}`);
+    assert.equal(badges.filter(b => b.startsWith('env:')).length, 1, 'inheriting tenant must not get a badge');
   });
 
   check('renders endpoints table', () => {

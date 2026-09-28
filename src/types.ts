@@ -12,6 +12,17 @@ export interface Tenant {
   disabled?: boolean;
   /** MCP tool names the user has turned off for agents (intent + context shaping). */
   disabledTools?: string[];
+  /**
+   * `{env}.{account}` slug for this tenant when it lives in a different
+   * environment than its enterprise (e.g. `qa.mfgx` under a `build.mfgx`
+   * enterprise). Omitted → inherits the enterprise's environment. When set,
+   * the enterprise's explicit `*Url` overrides are NOT inherited, since they
+   * point at the enterprise's host.
+   */
+  environment?: string;
+  mcpServerUrl?: string;
+  flowExecutionUrl?: string;
+  webhookUrl?: string;
   /** @deprecated legacy plaintext key — migrated into SecretStorage on load */
   apiKey?: string;
 }

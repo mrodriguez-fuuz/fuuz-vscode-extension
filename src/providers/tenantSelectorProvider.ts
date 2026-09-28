@@ -67,6 +67,11 @@ export class TenantSelectorProvider implements vscode.TreeDataProvider<TenantIte
           item.iconPath = new vscode.ThemeIcon('check');
           item.description = '(active)';
         }
+        // A tenant in a different environment than its enterprise shows its slug.
+        const env = this.configManager.environmentOf(enterprise, t);
+        if (env && env !== (enterprise.environment ?? '').trim()) {
+          item.description = item.description ? `${env} · ${item.description}` : env;
+        }
 
         item.command = {
           title: 'Select Tenant',

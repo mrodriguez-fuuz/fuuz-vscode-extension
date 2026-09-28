@@ -52,6 +52,30 @@ Notes:
 - A tenant may carry `"disabled": true` — kept in config but excluded from MCP
   registration and `.vscode/mcp.json`.
 
+## Tenants in different environments
+
+An enterprise's tenants can live in different environments (e.g. Build, QA,
+Prod). A tenant with its own `environment` resolves every endpoint — including
+its MCP server — from that slug; a tenant without one inherits the enterprise's.
+
+```json
+{
+  "id": "fuuz-administration",
+  "environment": "build.mfgx",
+  "tenants": [
+    { "id": "adminBuild", "name": "Build" },
+    { "id": "adminQa", "name": "QA", "environment": "qa.mfgx" }
+  ]
+}
+```
+
+- **Add Connection by API Key** sets this automatically when the key's
+  environment differs from the enterprise's.
+- A tenant with its own `environment` does **not** inherit the enterprise's
+  `*Url` overrides (they point at the enterprise's host). Tenants accept the same
+  `mcpServerUrl` / `flowExecutionUrl` / `webhookUrl` overrides.
+- QA targets and **Open in Fuuz** use the active tenant's environment.
+
 ## Managing connections
 
 In **Fuuz: Configure Connections**: set active, **Test endpoints**, **Replace

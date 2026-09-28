@@ -62,3 +62,15 @@ test('httpEntry: embeds the token when given, else references the env var', () =
   assert.equal(ref.headers.Authorization, 'Bearer ${FUUZ_TOKEN_MFGX_PLANT1}');
   assert.ok(!ref.headers.Authorization.includes('TOKEN_ABC'), 'env-ref entry must not embed the token');
 });
+
+test('plannedServers: resolves the MCP URL per tenant', () => {
+  const configManager: any = {
+    getEnterprises: () => [{
+      id: 'e1', name: 'E1', environment: 'build.mfgx', mcpEndpoint: '',
+      tenants: [{ id: 'b1', name: 'Build' }, { id: 'q1', name: 'QA', environment: 'qa.mfgx' }],
+    }],
+    getMcpServerUrl: (_e: any, t: any) => `https://api.${t?.environment ?? 'build.mfgx'}.fuuz.app/mcp`,
+  };
+  const planned = new ClaudeMcpWriter(configManager, {} as any).plannedServers();
+  assert.deepEqual(planned.map(p => p.url), ['https://api.build.mfgx.fuuz.app/mcp', 'https://api.qa.mfgx.fuuz.app/mcp']);
+});

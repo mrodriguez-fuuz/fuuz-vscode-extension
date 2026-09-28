@@ -52,7 +52,7 @@ export class TenantDataService {
       if (key.startsWith(`${tenant.id}:`)) this.fieldCache.delete(key);
     }
 
-    const endpoints = this.configManager.endpointsFor(enterprise);
+    const endpoints = this.configManager.endpointsFor(enterprise, this.configManager.getTenant(enterprise.id, tenant.id) ?? tenant);
     let mcp = null;
     try {
       mcp = await this.mcpClient.loadMcpSnapshot(endpoints.mcp, token);
@@ -129,7 +129,7 @@ export class TenantDataService {
     if (!enterprise) return null;
     const token = await this.tokenStore.getToken(enterprise.id, tenant.id);
     if (!token) return null;
-    const mcpUrl = this.configManager.endpointsFor(enterprise).mcp;
+    const mcpUrl = this.configManager.endpointsFor(enterprise, this.configManager.getTenant(enterprise.id, tenant.id) ?? tenant).mcp;
     const entry = { enterprise, token, mcpUrl, at: Date.now() };
     this.connCache.set(tenant.id, entry);
     return entry;
