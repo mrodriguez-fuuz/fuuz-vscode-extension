@@ -88,6 +88,21 @@ stores it securely, and re-probes all endpoints.
 Tokens are referenced via a password `${input:…}` prompt, so the secret is not
 written to disk. Existing non-Fuuz entries in the file are preserved.
 
+## Claude auto-register
+
+With `fuuz.claudeAutoRegister` on (default `userAndDesktop`), the enabled
+connections are written to `~/.claude.json` (Claude Code) and Claude Desktop's
+`claude_desktop_config.json`. This happens on startup and on every connection
+change, with the token embedded. Set it to `off` in **User** settings to stop
+this. It is application-scoped, so a workspace `.vscode/settings.json` value is
+ignored. Entries already written stay until removed (`claude mcp remove <name>`).
+
+Each sync **replaces every `fuuz-*` entry** with the connections of the VS Code
+instance that ran it. Two instances with different connection sets (e.g. a
+second profile or a `--user-data-dir` test window) overwrite each other, and
+whichever syncs last decides what Claude sees. Keep one set of connections, or
+turn auto-register off in the other instance.
+
 ## MCP availability
 
 If your subscription does not include MCP, MCP-dependent features (server

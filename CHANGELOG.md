@@ -2,6 +2,21 @@
 
 All notable changes to **Fuuz for VS Code**.
 
+## Unreleased
+
+### Added — tenants in different environments get their own MCP server
+An enterprise's environment slug drove every tenant's endpoints. As a result, a QA
+or Prod tenant under a Build enterprise was registered against the Build MCP
+server. Importing its key kept the enterprise's slug too, so the key was validated
+against the wrong host. A tenant can now carry its own `environment` (and `*Url`
+overrides). **Add Connection by API Key** sets it when the key's environment
+differs. The MCP provider, `.vscode/mcp.json` and the Claude config writers resolve
+the URL per tenant.
+
+### Fixed — QA target classification used the enterprise's environment
+A Prod tenant under a Build enterprise was classified as a test environment.
+QA targets and **Open in Fuuz** now use the active tenant's environment.
+
 ## 1.2.2
 
 ### Fixed — `fk-relation-pairing` treated a business key as a foreign key
