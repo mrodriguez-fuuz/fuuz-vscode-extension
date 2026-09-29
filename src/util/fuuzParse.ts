@@ -22,12 +22,52 @@ export function classifyTool(name: string, description?: string): McpTool {
 export type Rec = Record<string, string>;
 
 /**
+ * The JSON body of a tool response that isn't TRON. Newer MCP versions answer
+ * `system_query_model` in JSON by default, after the same one-line preamble
+ * (`Retrieved N record(s) from X. Results in JSON format:`). Only a declared
+ * JSON payload or a bare JSON body counts — an error message that merely
+ * embeds JSON (e.g. a validation issue list) returns undefined.
+ */
+export function jsonPayload(text: string): unknown {
+  if (!text) return undefined;
+  const declared = text.match(/Results in JSON format:\s*/);
+  const body = declared ? text.slice((declared.index ?? 0) + declared[0].length) : text.trim();
+  if (!declared && !/^[[{]/.test(body)) return undefined;
+  try {
+    return JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/**
+ * Flatten a JSON record to the string-valued shape the TRON parser yields:
+ * nested objects become dotted keys (matching the `a.b` field paths queried),
+ * arrays are kept as JSON text, and null/undefined become ''.
+ */
+function flattenRecord(obj: Record<string, unknown>, prefix = '', out: Rec = {}): Rec {
+  for (const [k, v] of Object.entries(obj)) {
+    const key = prefix ? `${prefix}.${k}` : k;
+    if (isPlainObject(v)) flattenRecord(v, key, out);
+    else if (Array.isArray(v)) out[key] = JSON.stringify(v);
+    else out[key] = v === null || v === undefined ? '' : String(v);
+  }
+  return out;
+}
+
+/**
  * Parse Fuuz "TRON" output from a record query into plain objects. The payload
  * declares one class (e.g. `class A: id,name,moduleId`) then a `[A(...),…]`
  * array of tuples; values are quoted strings (which may contain commas/parens),
  * so arguments are split respecting quotes and nesting.
  */
 export function parseTronRecords(text: string): Rec[] {
+  const json = jsonPayload(text);
+  if (json !== undefined) return Array.isArray(json) ? json.filter(isPlainObject).map(r => flattenRecord(r)) : [];
   const cls = text.match(/class\s+([A-Z])\s*:\s*([^\n]+)/);
   if (!cls) return [];
   const letter = cls[1];
@@ -93,13 +133,25 @@ export function readArgs(str: string, openParen: number): string[] | null {
  * metadata tuples).
  */
 export function parseModelFieldRecords(text: string): Rec[] {
-  const cls = text.match(/class\s+([A-Z])\s*:\s*([^\n]+)/);
-  if (!cls) return [];
+  const json = jsonPayload(text);
+  if (json !== undefined) {
+    return (Array.isArray(json) ? json : [])
+      .flatMap(m => (isPlainObject(m) && Array.isArray(m.fields) ? m.fields : [m]))
+      .filter(isPlainObject)
+      .map(f => ({ name: String(f.name ?? ''), type: String(f.type ?? ''), description: String(f.description ?? '') }))
+      .filter(f => f.name);
+  }
+  // Newer servers nest the tuples — `class A: name,fields` wraps
+  // `class B: name,type,description` — so pick the class that carries `type`
+  // (the field records), not simply the first one declared.
+  const classes = [...text.matchAll(/class\s+([A-Z])\s*:\s*([^\n]+)/g)];
+  if (!classes.length) return [];
+  const cls = classes.find(c => c[2].split(',').map(s => s.trim()).includes('type')) ?? classes[0];
   const letter = cls[1];
   const cols = cls[2].split(',').map(s => s.trim());
   const recs: Rec[] = [];
   let inQuote = false;
-  for (let i = cls.index ?? 0; i < text.length; i++) {
+  for (let i = classes[0].index ?? 0; i < text.length; i++) {
     const ch = text[i];
     if (inQuote) {
       if (ch === '\\') i++;
@@ -145,6 +197,19 @@ export function isRelationType(type: string): boolean {
 /** Extract model names from a `system_list_models` TRON payload (tuple first args). */
 export function extractModelNames(text: string): string[] {
   const names = new Set<string>();
+  const json = jsonPayload(text);
+  if (json !== undefined) {
+    // kind > moduleGroup > module > [{ name, … }] — collect every entry's name.
+    const walk = (v: unknown): void => {
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (isPlainObject(v)) {
+        if (typeof v.name === 'string') names.add(v.name);
+        else Object.values(v).forEach(walk);
+      }
+    };
+    walk(json);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }
   const re = /[A-Z]\("((?:[^"\\]|\\.)*)"/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) names.add(m[1]);
